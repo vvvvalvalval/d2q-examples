@@ -1,0 +1,19 @@
+{:deps
+ {org.clojure/clojure {:mvn/version "1.8.0"}
+  manifold {:mvn/version "0.1.6"}
+  vvvvalvalval/d2q
+  {:git/url "https://github.com/vvvvalvalval/d2q" :sha "6857ae6b35796c3dac1263f1c91260ff5164755d"}
+  #_{:local/root "/Users/val/projects/d2q"}
+
+  datascript {:mvn/version "0.16.6"}
+
+  org.clojure/java.jdbc {:mvn/version "0.7.8"}
+  com.h2database/h2 {:mvn/version "1.4.197"}}
+ :aliases
+ {:dev
+  {:extra-deps
+   {midje {:mvn/version "1.7.0"}
+    vvvvalvalval/scope-capture {:mvn/version "0.1.4"}
+    vvvvalvalval/scope-capture-nrepl {:mvn/version "0.2.0"}
+    criterium {:mvn/version "0.4.4"}
+    vvvvalvalval/supdate {:mvn/version "0.2.1"}}}}}
