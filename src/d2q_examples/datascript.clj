@@ -1,4 +1,5 @@
 (ns d2q-examples.datascript
+  "d2q example with a DataScript data source."
   (:require [d2q.api :as d2q]
             [manifold.deferred :as mfd]
             [datascript.core :as dt]

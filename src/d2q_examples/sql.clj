@@ -1,4 +1,5 @@
 (ns d2q-examples.sql
+  "d2q example with a JDBC data source (H2)."
   (:require [clojure.java.jdbc :as jdbc]
             [manifold.deferred :as mfd]
             [d2q-examples.utils :as u]
@@ -113,33 +114,32 @@
     (d2q-res/entities-independent-resolver
       (fn [{:as qctx :keys [conn]} i+fcalls]
         (mfd/future
-          (letfn []
-            (let [ent-id->is (u/group-and-map-by
-                               (fn [[_i fcall]]
-                                 (-> fcall :d2q-fcall-arg field-name))
-                               (fn [[i _fcall]] i)
-                               i+fcalls)
-                  q [(format "SELECT %1$s FROM %2$s WHERE %1$s = ANY (?)"
-                       (name column-name) (name table-name))
-                     (into-array String (keys ent-id->is))]
-                  found-ent-ids (into #{}
-                                  (map column-name)
-                                  (jdbc/query conn q))
-                  missing-ent-ids (->> ent-id->is keys (remove found-ent-ids))
-                  not-found-errors
-                  (for [ent-id missing-ent-ids
-                        i (get ent-id->is ent-id)]
-                    (ex-info
-                      (str "No " human-readable-entity-type " with " (pr-str field-name) " : " (pr-str ent-id))
-                      {:myblog.errors/error-type :myblog.error-types/entity-not-found
-                       :d2q-fcall-i i
-                       field-name ent-id}))]
-              {:d2q-errors (vec not-found-errors)
-               :d2q-res-cells (vec
-                                (for [user-id found-ent-ids
-                                      i (get ent-id->is user-id)]
-                                  (d2q/result-cell -1 i
-                                    {field-name user-id})))})))))))
+          (let [ent-id->is (u/group-and-map-by
+                             (fn [[_i fcall]]
+                               (-> fcall :d2q-fcall-arg field-name))
+                             (fn [[i _fcall]] i)
+                             i+fcalls)
+                q [(format "SELECT %1$s FROM %2$s WHERE %1$s = ANY (?)"
+                     (name column-name) (name table-name))
+                   (into-array String (keys ent-id->is))]
+                found-ent-ids (into #{}
+                                (map column-name)
+                                (jdbc/query conn q))
+                missing-ent-ids (->> ent-id->is keys (remove found-ent-ids))
+                not-found-errors
+                (for [ent-id missing-ent-ids
+                      i (get ent-id->is ent-id)]
+                  (ex-info
+                    (str "No " human-readable-entity-type " with " (pr-str field-name) " : " (pr-str ent-id))
+                    {:myblog.errors/error-type :myblog.error-types/entity-not-found
+                     :d2q-fcall-i i
+                     field-name ent-id}))]
+            {:d2q-errors (vec not-found-errors)
+             :d2q-res-cells (vec
+                              (for [user-id found-ent-ids
+                                    i (get ent-id->is user-id)]
+                                (d2q/result-cell -1 i
+                                  {field-name user-id})))}))))))
 
 (defn resolver-reading-table-rows
   [table-name id-attr primary-key-col]
@@ -159,22 +159,21 @@
                 (u/group-and-map-by
                   (fn [[j ent]] (id-attr ent))
                   (fn [[j ent]] j)))
-              columns-infos->is
+              columns-infos
               (->> i+fcalls
-                (u/group-and-map-by
-                  (fn [[_i _fcall field-meta]]
+                (mapv
+                  (fn [[i _fcall field-meta]]
                     (merge
                       (when-let [column-name (:myblog.sql/column-name field-meta)]
                         {:myblog.sql/required-columns [column-name]
-                         :myblog.sql/read-value-from-row (fn [row] (get row column-name))})
+                         :myblog.sql/read-value-from-row column-name})
                       (select-keys field-meta [:myblog.sql/post-process-fn
                                                :myblog.sql/discard-if-nil?
                                                :myblog.sql/required-columns
-                                               :myblog.sql/read-value-from-row])))
-                  (fn [[i _fcall _field-meta]]
-                    i)))
+                                               :myblog.sql/read-value-from-row])
+                      {:d2q-fcall-i i}))))
               q [(str "SELECT "
-                   (->> columns-infos->is keys
+                   (->> columns-infos
                      (mapcat :myblog.sql/required-columns)
                      (into #{primary-key-col})
                      (map name)
@@ -182,21 +181,21 @@
                    " FROM " (name table-name)
                    " WHERE " (name primary-key-col) " = ANY (?)")
                  (into-array (keys ent-id->js))]]
-          (d2q-res/into-resolver-result
-            (for [row (jdbc/query conn q)
-                  :let [ent-id (primary-key-col row)]
-                  j (get ent-id->js ent-id)
-                  [columns-info is] columns-infos->is
-                  :let [{post-process-fn :myblog.sql/post-process-fn
-                         discard-if-nil? :myblog.sql/discard-if-nil?
-                         read-value-from-row :myblog.sql/read-value-from-row
-                         :or {post-process-fn identity
-                              discard-if-nil? false}} columns-info
-                        raw-v (read-value-from-row row)
-                        v (post-process-fn raw-v)]
-                  :when (not (and discard-if-nil? (nil? v)))
-                  i is]
-              (d2q/result-cell j i v))))))))
+          {:d2q-res-cells
+           (for [row (jdbc/query conn q)
+                 :let [ent-id (primary-key-col row)]
+                 j (get ent-id->js ent-id)
+                 {i :d2q-fcall-i
+                  post-process-fn :myblog.sql/post-process-fn
+                  discard-if-nil? :myblog.sql/discard-if-nil?
+                  read-value-from-row :myblog.sql/read-value-from-row
+                  :or {post-process-fn identity
+                       discard-if-nil? false}
+                  } columns-infos
+                 :let [raw-v (read-value-from-row row)
+                       v (post-process-fn raw-v)]
+                 :when (not (and discard-if-nil? (nil? v)))]
+             (d2q/result-cell j i v))})))))
 
 ;; ------------------------------------------------------------------------------
 ;; Server
