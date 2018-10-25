@@ -2,7 +2,8 @@
  {org.clojure/clojure {:mvn/version "1.8.0"}
   manifold {:mvn/version "0.1.6"}
   vvvvalvalval/d2q
-  {:git/url "https://github.com/vvvvalvalval/d2q" :sha "6857ae6b35796c3dac1263f1c91260ff5164755d"}
+  {:mvn/version "0.1.0"}
+  #_{:git/url "https://github.com/vvvvalvalval/d2q" :sha "6857ae6b35796c3dac1263f1c91260ff5164755d"}
   #_{:local/root "/Users/val/projects/d2q"}
 
   datascript {:mvn/version "0.16.6"}
